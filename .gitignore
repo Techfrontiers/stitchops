@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Environment & local secrets
+.env
+.env.local
+.env.*.local
+
+# OS / Editor noise
+.DS_Store
+Thumbs.db
+*.log
+
+# IMPORTANT (Kiroween 2026 Rule):
+# Never ignore /.kiro — Kiro specs, steering, hooks, and settings must remain tracked!
+*.tsbuildinfo

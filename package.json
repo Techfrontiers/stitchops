@@ -1,0 +1,38 @@
+{
+  "name": "stitchops",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kiroween 2026 Frankenstein Chimera: COBOL Copybook Parser + Binary Telemetry Verifier + Schema Bridge + Live Anatomy Workbench",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.app.json --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "stitch": "node scripts/stitchops-cli.ts",
+    "check:kiro": "node scripts/check-kiro-compliance.mjs"
+  },
+  "license": "MIT",
+  "author": "Phitthaya Boonmee <sydear@outlook.co.th>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Techfrontiers/stitchops.git"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "fast-check": "^3.23.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.0",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

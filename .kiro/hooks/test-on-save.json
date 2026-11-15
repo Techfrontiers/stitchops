@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "verify-organs-on-save",
+      "trigger": "PostFileSave",
+      "matcher": "^src/(organs|components)/.*\\.(ts|tsx)$",
+      "action": {
+        "type": "command",
+        "command": "npm run typecheck && npm test"
+      }
+    }
+  ]
+}

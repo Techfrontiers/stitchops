@@ -1,0 +1,23 @@
+# StitchOps Core — Implementation Tasks
+
+- [x] **Task 0: Workspace, License & Kiro Foundation**
+  - Initialize `package.json`, TypeScript config, `.gitignore` (preserving `/.kiro`), MIT `LICENSE`, and `.kiro/` steering/specs/hooks/settings/agents.
+- [x] **Task 1: Organ 1 — COBOL Copybook Parser & Fixed-Width Codec (`src/organs/cobol-parser.ts`)**
+  - Implement `parseCopybook`, `decodeRecord`, `encodeRecord`, and diagnostic reporting.
+  - Verify against Requirement 1 & Requirement 2.
+- [x] **Task 2: Organ 2 — Binary Telemetry Frame & FSM Verifier (`src/organs/packet-verifier.ts`)**
+  - Implement CRC-16/XMODEM, binary frame encoder/decoder (`Uint8Array`), hex dump helper, and FSM validator.
+  - Verify against Requirement 3.
+- [x] **Task 3: Organ 3 — Schema Bridge & ABEND Triage (`src/organs/schema-bridge.ts`)**
+  - Implement JSON Schema 2020-12 / OpenAPI 3.1 generator and deterministic ABEND + corruption remediation engine.
+  - Verify against Requirement 4.
+- [x] **Task 4: Organ 4 — Stitch Pipeline & Sample Data (`src/organs/stitch-pipeline.ts`, `src/data/samples.ts`)**
+  - Connect all organs into an end-to-end pipeline with fault injection and one-click repair replay.
+- [x] **Task 5: Property-Based & Unit Test Suite (`tests/*.test.ts`)**
+  - Write `vitest` + `fast-check` tests covering Properties P1–P4 and edge cases.
+- [x] **Task 6: Frankenstein Anatomy Workbench UI (`src/App.tsx`, `src/components/*`)**
+  - Build dark-mode Bio-Telemetry Lab interface with organ stitch graph, copybook/batch live editor, binary hex inspector, fault injection controls, and synthesized OpenAPI viewer.
+- [x] **Task 7: Visual Anatomy Graph, File Export & CLI Runner**
+  - Add animated SVG `AnatomyGraph`, `.cpy`/`.dat` upload, `.stf` / OpenAPI downloads, `scripts/stitchops-cli.ts`, and Property P5 comprehensive tests.
+- [ ] **Task 8: Kiro IDE Session, GitHub Publish (`@Techfrontiers/stitchops`) & Demo Video (< 3 min)**
+  - Open project in Kiro IDE/CLI after Didit ID credit approval, publish public GitHub repo (`Techfrontiers/stitchops`), record <3 min YouTube demo, and submit on Devpost.
