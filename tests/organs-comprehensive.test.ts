@@ -145,4 +145,117 @@ describe('StitchOps — Comprehensive Organ, Schema & CLI Verification', () => {
     expect(parsed.ok).toBe(true);
     expect(parsed.stats.settledCount).toBe(3);
   });
+
+  it('S322 fault without repair produces ABENDED diagnostic and halts before frame encoding', () => {
+    const sample = SAMPLE_SCENARIOS[0]!;
+    const result = runStitchPipeline({
+      copybookSource: sample.copybook,
+      batchLines: sample.batchLines,
+      faultMode: 'S322_BATCH_TIMEOUT',
+      autoRepair: false,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.stats.abendedCount).toBeGreaterThan(0);
+    const firstTrace = result.traces[0];
+    expect(firstTrace?.status).toBe('ABENDED');
+    expect(firstTrace?.stateHistory).toEqual(['INIT', 'ABENDED']);
+    expect(firstTrace?.diagnostics.some((d) => d.code === 'S322_BATCH_TIMEOUT')).toBe(true);
+    expect(result.triage.some((t) => t.signature === 'S322')).toBe(true);
+    expect(result.repairDiffs.length).toBe(0);
+  });
+
+  it('S322 fault with repair recovers to SETTLED with valid FSM and produces repair diff', () => {
+    const sample = SAMPLE_SCENARIOS[0]!;
+    const result = runStitchPipeline({
+      copybookSource: sample.copybook,
+      batchLines: sample.batchLines,
+      faultMode: 'S322_BATCH_TIMEOUT',
+      autoRepair: true,
+    });
+
+    expect(result.ok).toBe(true);
+    const firstTrace = result.traces[0];
+    expect(firstTrace?.status).toBe('SETTLED');
+    expect(firstTrace?.stateHistory).toEqual(['INIT', 'ABENDED', 'REPAIRED', 'STAGED', 'SETTLED']);
+
+    expect(result.repairDiffs.length).toBeGreaterThan(0);
+    const diff = result.repairDiffs[0];
+    expect(diff?.recordId).toBe(1);
+    expect(diff?.fieldName).toBe('__FULL_RECORD__');
+    expect(diff?.repairAction).toBe('RECOVER_S322_CHECKPOINT');
+    expect(diff?.afterHex.length).toBeGreaterThan(0);
+  });
+
+  it('TRUNCATE_RECORD with autoRepair produces PAD_TRUNCATED repair diff', () => {
+    const sample = SAMPLE_SCENARIOS[0]!;
+    const result = runStitchPipeline({
+      copybookSource: sample.copybook,
+      batchLines: sample.batchLines,
+      faultMode: 'TRUNCATE_RECORD',
+      autoRepair: true,
+    });
+
+    expect(result.repairDiffs.length).toBeGreaterThan(0);
+    const diff = result.repairDiffs[0];
+    expect(diff?.repairAction).toBe('PAD_TRUNCATED');
+    expect(diff).toBeDefined();
+    if (diff) {
+      expect(diff.beforeValue.length).toBeLessThan(diff.afterValue.length);
+    }
+  });
+
+  it('S0C7_CORRUPTION with autoRepair produces SANITIZE_NUMERIC repair diff', () => {
+    const sample = SAMPLE_SCENARIOS[0]!;
+    const result = runStitchPipeline({
+      copybookSource: sample.copybook,
+      batchLines: sample.batchLines,
+      faultMode: 'S0C7_CORRUPTION',
+      autoRepair: true,
+    });
+
+    expect(result.repairDiffs.length).toBeGreaterThan(0);
+    const diff = result.repairDiffs[0];
+    expect(diff?.repairAction).toBe('SANITIZE_NUMERIC');
+    expect(diff?.beforeHex).not.toBe(diff?.afterHex);
+  });
+
+  it('Property P6: S322 repair produces deterministic repairDiffs across multiple runs', () => {
+    const sample = SAMPLE_SCENARIOS[2]!; // insurance-claims-batch
+    const config = {
+      copybookSource: sample.copybook,
+      batchLines: sample.batchLines,
+      faultMode: 'S322_BATCH_TIMEOUT' as const,
+      autoRepair: true,
+    };
+
+    const result1 = runStitchPipeline(config);
+    const result2 = runStitchPipeline(config);
+
+    expect(result1.repairDiffs.length).toBeGreaterThan(0);
+    expect(JSON.stringify(result1.repairDiffs)).toBe(JSON.stringify(result2.repairDiffs));
+  });
+
+  it('Property P7: Every repaired record produces at least one RepairDiffEntry', () => {
+    const allFaultModes: Array<'TRUNCATE_RECORD' | 'S0C7_CORRUPTION' | 'S322_BATCH_TIMEOUT'> = [
+      'TRUNCATE_RECORD',
+      'S0C7_CORRUPTION',
+      'S322_BATCH_TIMEOUT',
+    ];
+
+    for (const faultMode of allFaultModes) {
+      const sample = SAMPLE_SCENARIOS[0]!;
+      const result = runStitchPipeline({
+        copybookSource: sample.copybook,
+        batchLines: sample.batchLines,
+        faultMode,
+        autoRepair: true,
+      });
+
+      const repairedCount = result.traces.filter((t) => t.stateHistory.includes('REPAIRED')).length;
+      if (repairedCount > 0) {
+        expect(result.repairDiffs.length).toBeGreaterThanOrEqual(repairedCount);
+      }
+    }
+  });
 });

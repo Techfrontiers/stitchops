@@ -21,7 +21,7 @@ import {
   type OrganHeartbeat,
 } from './organs/stitch-pipeline.ts';
 
-type InspectorTab = 'traces' | 'hex' | 'schema';
+type InspectorTab = 'traces' | 'hex' | 'schema' | 'repairs';
 
 const FAULT_OPTIONS: Array<{ value: FaultInjectionMode; label: string }> = [
   { value: 'NONE', label: 'No Fault (Healthy Batch)' },
@@ -29,6 +29,7 @@ const FAULT_OPTIONS: Array<{ value: FaultInjectionMode; label: string }> = [
   { value: 'TRUNCATE_RECORD', label: 'Inject Truncated Record Width' },
   { value: 'BINARY_BIT_FLIP', label: 'Inject Binary CRC-16 Bit-Flip' },
   { value: 'FSM_BYPASS', label: 'Inject Illegal FSM Bypass (ABENDED -> SETTLED)' },
+  { value: 'S322_BATCH_TIMEOUT', label: 'Inject S322 Batch Timeout (Checkpoint Recovery)' },
 ];
 
 export default function App() {
@@ -333,6 +334,15 @@ export default function App() {
                 <Cpu size={15} />
                 Synthesized OpenAPI 3.1
               </button>
+              <button
+                type="button"
+                className={`action-btn ${activeTab === 'repairs' ? 'active-acid' : ''}`}
+                onClick={() => setActiveTab('repairs')}
+                disabled={report.repairDiffs.length === 0}
+              >
+                <Wrench size={15} />
+                Surgical Repair Diffs ({report.repairDiffs.length})
+              </button>
             </div>
 
             <div className="toolbar-inline">
@@ -430,6 +440,64 @@ export default function App() {
                   ? JSON.stringify(report.contract.openApiSnippet, null, 2)
                   : 'Fix Copybook errors to generate OpenAPI contract.'}
               </pre>
+            </div>
+          )}
+
+          {activeTab === 'repairs' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {report.repairDiffs.length === 0 ? (
+                <div className="organ-meta" style={{ textAlign: 'center', padding: 40 }}>
+                  No repair diffs captured. Enable Auto-Repair with a fault injection mode to see surgical transformations.
+                </div>
+              ) : (
+                report.repairDiffs.map((diff, idx) => (
+                  <div key={idx} className="trace-card" style={{ borderColor: 'var(--amber)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong>
+                        Record #{diff.recordId} · Field: {diff.fieldName}
+                      </strong>
+                      <span
+                        style={{
+                          background: 'rgba(245, 185, 66, 0.14)',
+                          color: 'var(--amber)',
+                          padding: '2px 8px',
+                          borderRadius: '999px',
+                          fontSize: '0.72rem',
+                          fontFamily: 'var(--mono)',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {diff.repairAction}
+                      </span>
+                    </div>
+
+                    <div className="organ-meta" style={{ marginTop: 4 }}>
+                      Byte Range: {diff.offsetStart}..{diff.offsetStart + diff.offsetLength - 1} ({diff.offsetLength} bytes)
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: 4, color: 'var(--crimson)' }}>
+                          ❌ Before Repair
+                        </div>
+                        <pre className="mono-box" style={{ background: 'rgba(255, 77, 109, 0.08)', border: '1px solid rgba(255, 77, 109, 0.3)' }}>
+                          {diff.beforeValue}
+                          {diff.beforeHex && `\n\nHex: ${diff.beforeHex}`}
+                        </pre>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: 4, color: 'var(--acid)' }}>
+                          ✅ After Repair
+                        </div>
+                        <pre className="mono-box" style={{ background: 'rgba(56, 242, 158, 0.08)', border: '1px solid rgba(56, 242, 158, 0.3)' }}>
+                          {diff.afterValue}
+                          {diff.afterHex && `\n\nHex: ${diff.afterHex}`}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </section>

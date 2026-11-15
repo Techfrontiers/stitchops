@@ -39,4 +39,19 @@ export const SAMPLE_SCENARIOS: SampleScenario[] = [
       'CONT-88414TYO9-20100099',
     ].join('\n'),
   },
+  {
+    id: 'insurance-claims-batch',
+    name: 'Insurance Claims Batch Processing (S322 Checkpointing)',
+    subtitle: 'Long-running legacy batch with checkpoint recovery simulation',
+    copybook: `       01  CLAIM-BATCH-REC.
+           05  CLAIM-ID         PIC X(10).
+           05  POLICY-NUM       PIC X(12).
+           05  CLAIM-AMT        PIC S9(7)V99.
+           05  STATUS-CODE      PIC X(2).`,
+    batchLines: [
+      'CLM0000001POL-88901234+001250500AC',
+      'CLM0000002POL-88901235-000045250RE',
+      'CLM0000003POL-88901236+050000000SE',
+    ].join('\n'),
+  },
 ];

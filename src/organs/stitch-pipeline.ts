@@ -27,7 +27,57 @@ import {
  * Organ 4: Unified Frankenstein Pipeline Orchestrator.
  */
 
-export type FaultInjectionMode = 'NONE' | 'S0C7_CORRUPTION' | 'TRUNCATE_RECORD' | 'BINARY_BIT_FLIP' | 'FSM_BYPASS';
+export type FaultInjectionMode = 'NONE' | 'S0C7_CORRUPTION' | 'TRUNCATE_RECORD' | 'BINARY_BIT_FLIP' | 'FSM_BYPASS' | 'S322_BATCH_TIMEOUT';
+
+export interface RepairDiffEntry {
+  /**
+   * Record line number (1-indexed) that was repaired.
+   */
+  recordId: number;
+
+  /**
+   * COBOL field name that was healed.
+   * Use '__FULL_RECORD__' for record-level repairs (S322, TRUNCATE_RECORD).
+   */
+  fieldName: string;
+
+  /**
+   * Starting byte offset within the fixed-width line where repair began.
+   */
+  offsetStart: number;
+
+  /**
+   * Number of bytes modified during repair.
+   */
+  offsetLength: number;
+
+  /**
+   * Human-readable string representation before repair.
+   */
+  beforeValue: string;
+
+  /**
+   * Human-readable string representation after repair.
+   */
+  afterValue: string;
+
+  /**
+   * Hexadecimal dump of the exact byte sequence before repair.
+   * Format: space-separated uppercase hex pairs (e.g., "48 65 6C 6C 6F").
+   */
+  beforeHex: string;
+
+  /**
+   * Hexadecimal dump of the exact byte sequence after repair.
+   * Format: space-separated uppercase hex pairs.
+   */
+  afterHex: string;
+
+  /**
+   * Machine-readable repair operation identifier.
+   */
+  repairAction: 'SANITIZE_NUMERIC' | 'PAD_TRUNCATED' | 'RECOVER_S322_CHECKPOINT';
+}
 
 export interface OrganHeartbeat {
   id: 'cobol-parser' | 'packet-verifier' | 'schema-bridge' | 'stitch-pipeline';
@@ -65,6 +115,21 @@ export interface PipelineExecutionReport {
     abendedCount: number;
     executionMs: number;
   };
+  /**
+   * Deterministic repair diff ledger capturing byte-level transformations.
+   * Empty array when autoRepair=false or no faults occur.
+   */
+  repairDiffs: RepairDiffEntry[];
+}
+
+/**
+ * Converts a string or Buffer to space-separated uppercase hex dump.
+ */
+function bufferToHex(input: string | Uint8Array): string {
+  const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : input;
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).toUpperCase().padStart(2, '0'))
+    .join(' ');
 }
 
 export function applyFaultToLine(line: string, mode: FaultInjectionMode): string {
@@ -162,6 +227,7 @@ export function runStitchPipeline(options: {
         abendedCount: 0,
         executionMs: Number((performance.now() - startedAt).toFixed(2)),
       },
+      repairDiffs: [],
     };
   }
 
@@ -173,6 +239,7 @@ export function runStitchPipeline(options: {
 
   const traces: StitchedRecordTrace[] = [];
   const anomalyTokens: string[] = [];
+  const repairDiffs: RepairDiffEntry[] = [];
   let settledCount = 0;
   let abendedCount = 0;
 
@@ -182,11 +249,68 @@ export function runStitchPipeline(options: {
     const stateHistory: OperationalState[] = ['INIT'];
     const diagnostics: StitchedRecordTrace['diagnostics'] = [];
 
+    // S322 Batch Timeout Fault Injection
+    if (faultMode === 'S322_BATCH_TIMEOUT' && index === 0) {
+      stateHistory.push('ABENDED');
+      const s322Diag = {
+        code: 'S322_BATCH_TIMEOUT',
+        message: 'Batch step CPU timeout at record boundary — checkpoint stall detected',
+      };
+      diagnostics.push(s322Diag);
+      anomalyTokens.push(`${s322Diag.code} ${s322Diag.message}`);
+
+      if (!autoRepair) {
+        abendedCount += 1;
+        traces.push({
+          lineNumber: seq,
+          rawLine: workingLine,
+          roundTripMatch: false,
+          frameBytesLength: 0,
+          frameHexPreview: '(S322 timeout — batch halted before frame encoding)',
+          stateHistory,
+          status: 'ABENDED',
+          diagnostics,
+        });
+        return;
+      }
+
+      // Auto-repair: simulate checkpoint recovery
+      stateHistory.push('REPAIRED');
+      repairDiffs.push({
+        recordId: seq,
+        fieldName: '__FULL_RECORD__',
+        offsetStart: 0,
+        offsetLength: workingLine.length,
+        beforeValue: '(Timed-out batch record pending checkpoint)',
+        afterValue: workingLine,
+        beforeHex: '',
+        afterHex: bufferToHex(workingLine),
+        repairAction: 'RECOVER_S322_CHECKPOINT',
+      });
+    }
+
     let decodedResult = decodeRecord(schema, workingLine);
 
     if (!decodedResult.ok && autoRepair) {
+      const beforeLine = workingLine;
       stateHistory.push('ABENDED', 'REPAIRED');
       workingLine = repairFixedWidthLine(schema, workingLine);
+      
+      const repairAction: RepairDiffEntry['repairAction'] =
+        faultMode === 'TRUNCATE_RECORD' ? 'PAD_TRUNCATED' : 'SANITIZE_NUMERIC';
+      
+      repairDiffs.push({
+        recordId: seq,
+        fieldName: '__FULL_RECORD__',
+        offsetStart: 0,
+        offsetLength: Math.max(beforeLine.length, workingLine.length),
+        beforeValue: beforeLine,
+        afterValue: workingLine,
+        beforeHex: bufferToHex(beforeLine),
+        afterHex: bufferToHex(workingLine),
+        repairAction,
+      });
+
       decodedResult = decodeRecord(schema, workingLine);
     }
 
@@ -355,5 +479,6 @@ export function runStitchPipeline(options: {
       abendedCount,
       executionMs: Number((performance.now() - startedAt).toFixed(2)),
     },
+    repairDiffs,
   };
 }
